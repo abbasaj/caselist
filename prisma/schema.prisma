@@ -1,0 +1,163 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(CLIENT) // CLIENT, LAWYER, ADMIN
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Lawyer specific fields
+  specialization  String?
+  yearsExperience Int?
+  barAssociationId String?
+  availability    Json? // e.g., { "timeSlots": [] }
+  fees            Json? // e.g., { "type": "hourly", "amount": 250 }
+  ratings         Float?
+  reviews         Review[]
+  casesAsLawyer   Case[] @relation("LawyerCases")
+
+  // Client specific fields
+  caseHistory     Case[] @relation("ClientCases")
+  savedLawyers    SavedLawyer[]
+  documents       Document[]
+  payments        Payment[]
+
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Case {
+  id             String      @id @default(cuid())
+  title          String
+  summary        String
+  status         CaseStatus  @default(OPEN)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  
+  // Relations
+  clientId       String
+  client         User        @relation("ClientCases", fields: [clientId], references: [id])
+  lawyerId       String?
+  lawyer         User?       @relation("LawyerCases", fields: [lawyerId], references: [id])
+  documents      Document[]
+  messages       Message[]
+  payments       Payment[]
+}
+
+model Document {
+  id        String @id @default(cuid())
+  name      String
+  url       String
+  caseId    String?
+  case      Case?   @relation(fields: [caseId], references: [id])
+  uploaderId String
+  uploader  User   @relation(fields: [uploaderId], references: [id])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id])
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+}
+
+model Payment {
+  id        String      @id @default(cuid())
+  amount    Float
+  status    PaymentStatus @default(PENDING)
+  stripeId  String      @unique
+  caseId    String
+  case      Case        @relation(fields: [caseId], references: [id])
+  clientId  String
+  client    User        @relation(fields: [clientId], references: [id])
+}
+
+model Review {
+  id           String @id @default(cuid())
+  rating       Float
+  comment      String
+  createdAt    DateTime @default(now())
+  lawyerId     String
+  lawyer       User     @relation(fields: [lawyerId], references: [id])
+  reviewerId   String
+  reviewer     User     @relation(fields: [reviewerId], references: [id])
+}
+
+model SavedLawyer {
+  id           String   @id @default(cuid())
+  clientId     String
+  client       User     @relation(fields: [clientId], references: [id])
+  lawyerId     String
+  lawyer       User     @relation(fields: [lawyerId], references: [id])
+}
+
+enum Role {
+  CLIENT
+  LAWYER
+  ADMIN
+}
+
+enum CaseStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+  DISPUTE
+}
+
+enum PaymentStatus {
+  PENDING
+  HELD
+  RELEASED
+  REFUNDED
+}
