@@ -215,8 +215,7 @@ function App() {
 
   return (
     <div className="App">
-      {/* Conditionally render the Navbar based on the current page. */}
-      {currentPage !== 'home' && <Navbar />}
+      <Navbar />
       <main>
         {renderContent()}
       </main>
